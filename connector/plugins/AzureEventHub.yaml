@@ -1,0 +1,18 @@
+apiVersion: dapr.io/v1alpha1
+kind: Component
+metadata:
+  name: azure-event-hub
+spec:
+  type: bindings.azure.eventhubs
+  version: v1
+  metadata:
+  - name: connectionString      # Azure EventHubs connection string
+    value: !ENV ${AZURE_EH_CONNECTIONSTRING}
+  - name: consumerGroup         # EventHubs consumer group
+    value: !ENV ${AZURE_EH_CONSUMER_GROUP}
+  - name: storageAccountName    # Azure Storage Account Name
+    value: !ENV ${AZURE_EH_STORAGE_ACCOUNT}   
+  - name: storageAccountKey     # Azure Storage Account Key
+    value: !ENV ${AZURE_EH_STORAGE_ACCOUNT_KEY}                
+  - name: storageContainerName  # Azure Storage Container Name
+    value: !ENV ${AZURE_EH_CONTAINER_NAME}
