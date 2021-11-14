@@ -1,15 +1,14 @@
-FROM balenalib/%%BALENA_MACHINE_NAME%%-debian-dotnet:5.0-sdk-buster-build as build
+FROM mcr.microsoft.com/dotnet/sdk:5.0 as build
 
 WORKDIR /usr/src/app
-COPY ./* /usr/src/app/
-RUN rm -rf /usr/src/app/obj
-RUN rm -rf /usr/src/app/bin
-RUN rm -rf /usr/src/app/Debug
+COPY *.csproj ./
+COPY ./plugins ./
+COPY ./*.cs ./
 
 RUN dotnet restore --runtime linux-musl-x64
 
 #Build and publish project
-RUN dotnet publish -p:PublishSingleFile=true -r linux-musl-x64 --self-contained true -p:PublishTrimmed=True  -p:TrimMode=Link  -c Release -o /usr/src/app/publish
+RUN dotnet publish -p:PublishSingleFile=true -r linux-musl-x64 --no-restore --self-contained true -p:PublishTrimmed=True -p:TrimMode=Link -c Release -o /usr/src/app/publish
 
 FROM balenalib/%%BALENA_MACHINE_NAME%%-alpine as run
 
@@ -27,8 +26,12 @@ ENV DOTNET_RUNNING_IN_CONTAINER=true
 
 WORKDIR /app
 COPY --from=build /usr/src/app/publish .
-COPY ./start.sh .
-RUN chmod +x start.sh
+COPY ./*.sh ./
+COPY ./VERSION ./
+RUN chmod +x *.sh
+
+RUN mkdir -p /app/plugins
+COPY ./plugins/*.yaml /app/plugins/
 
 RUN mkdir -p /app/components
 # Download daprd executable

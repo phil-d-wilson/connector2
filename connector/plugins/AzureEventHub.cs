@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using System;
 
 namespace connector.plugins
 {
@@ -7,13 +8,14 @@ namespace connector.plugins
         public AzureEventHub()
         {
             Name = "AzureEventHub";
-            EnvironmentVariables = new List<string> {
-                    "AZURE_EH_CONNECTIONSTRING",
-                    "AZURE_EH_CONSUMER_GROUP",
-                    "AZURE_EH_STORAGE_ACCOUNT",
-                    "AZURE_EH_STORAGE_ACCOUNT_KEY",
-                    "AZURE_EH_CONTAINER_NAME"
-                } ;
+            Direction = Environment.GetEnvironmentVariable("AZURE_EH_DIRECTION") ?? "output";
+            ConfigurationEnvironmentVariables = new Dictionary<string, string> {
+                    {"AZURE_EH_CONNECTIONSTRING", null},
+                    {"AZURE_EH_CONSUMER_GROUP", null},
+                    {"AZURE_EH_STORAGE_ACCOUNT", null},
+                    {"AZURE_EH_STORAGE_ACCOUNT_KEY", null},
+                    {"AZURE_EH_CONTAINER_NAME", null}
+                };
         }
 
     }

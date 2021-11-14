@@ -1,0 +1,14 @@
+apiVersion: dapr.io/v1alpha1
+kind: Component
+metadata:
+  name: MqttOutput
+spec:
+  type: pubsub.mqtt
+  version: v1
+  metadata:
+  - name: url
+    value: !ENV ${MQTT_OUTPUT_SERVER}
+  - name: topic
+    value: !ENV ${MQTT_OUTPUT_TOPIC}
+  - name: qos
+    value: !ENV ${MQTT_OUTPUT_QOS}
