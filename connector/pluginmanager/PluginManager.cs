@@ -4,13 +4,23 @@ using System.Reflection;
 using connector.plugins;
 using System.Threading.Tasks;
 using System.Collections.Generic;
+using connector.supervisor;
 
 namespace connector
 {
-    public class PluginManager
+    public class PluginManager : IPluginManager
     {
+        private ISupervisorHandler _supervisorHandler;
+
+        public PluginManager(ISupervisorHandler supervisorHandler)
+        {
+            _supervisorHandler = supervisorHandler;
+        }
+
         public async Task<List<Plugin>> LoadAsync()
         {
+            await _supervisorHandler.GetTargetStateAsync();
+
             Console.WriteLine("Finding plugins");
             var loadedPlugins = new List<Plugin> { };
 
@@ -33,15 +43,15 @@ namespace connector
             }
 
             Console.WriteLine("Done loading plugins");
-            await FindTargetStateAsync();
             return loadedPlugins;
         }
 
-        private static async Task<Plugin> TryLoadingPluginAsync(Type pluginInstance)
+        private async Task<Plugin> TryLoadingPluginAsync(Type pluginInstance)
         {
             try
             {
                 var instance = (Plugin)Activator.CreateInstance(pluginInstance);
+                instance.SupervisorHandler = _supervisorHandler;
                 if (await instance.TryLoadAsync())
                 {
                     return instance;
@@ -61,13 +71,6 @@ namespace connector
                          select t);
 
             return types;
-        }
-
-        private async static Task FindTargetStateAsync()
-        {
-            Console.WriteLine("PluginManager: Finding target state");
-            var sup = new SupervisorHelper();
-            await sup.GetTargetStateAsync();
         }
     }
 }

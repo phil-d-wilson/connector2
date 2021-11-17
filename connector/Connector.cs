@@ -8,23 +8,29 @@ using System.Linq;
 
 namespace connector
 {
-    public class connector
+    public class Connector
     {
-        private List<Plugin> plugins;
-        private List<DaprComponent> daprComponents;
+        private List<Plugin> _plugins;
+        private List<DaprComponent> _daprComponents;
+        private IPluginManager _pluginManager;
+        private IDaprHandler _daprHandler;
+
+        public Connector(IPluginManager pluginManager, IDaprHandler daprHelper)
+        {
+            _pluginManager = pluginManager;
+            _daprHandler = daprHelper;
+        }
 
         public async Task RunAsync()
         {
-            var pluginManager = new PluginManager();
-            plugins = await pluginManager.LoadAsync();
+            _plugins = await _pluginManager.LoadAsync();
 
             if (!StartDaprProcess())
             {
                 Console.WriteLine("Could not start daprd");
                 return;
             }
-            var dapr = new DaprHelper();
-            daprComponents = await dapr.GetLoadedComponentsAsync();
+            _daprComponents = await _daprHandler.GetLoadedComponentsAsync();
 
             ValidateSourcesAndSinks();
         }
@@ -38,15 +44,16 @@ namespace connector
         private void ValidateSource(string direction)
         {
             Console.WriteLine($"The following are {direction} components:");
-            foreach (var plugin in plugins.Where(p => p.Direction == direction))
+            foreach (var plugin in _plugins.Where(p => p.Direction == direction))
             {
-                if (daprComponents.Where(c => c.name == plugin.Name).Count() == 0)
+                if (_daprComponents.Where(c => c.name == plugin.Name).Count() == 0)
                 {
                     Console.WriteLine($"WARNING: {plugin.Name} was configured but dapr did not successfully load it.");
                     continue;
                 }
 
                 Console.WriteLine($"{plugin.Name}");
+                //DO SOME WIRING HERE
             }
         }
 

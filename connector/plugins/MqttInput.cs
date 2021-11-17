@@ -1,5 +1,4 @@
 using System.Collections.Generic;
-using System.Threading.Tasks;
 using System;
 
 namespace connector.plugins
@@ -10,16 +9,12 @@ namespace connector.plugins
         {
             Name = "MqttInput";
             Direction = "input";
+            ServiceName = "mqtt";
             ConfigurationEnvironmentVariables = new Dictionary<string, string> {
-                {"MQTT_INPUT_SERVER", "tcp://localhost:1883"},
+                {"MQTT_INPUT_SERVER", "tcp://${service-address}:${service-port}"},
                 {"MQTT_INPUT_TOPIC", "balena"},
                 {"MQTT_INPUT_QOS", "1"}
             };
         }
-
-        // private string GetServer()
-        // {
-
-        // }
     }
 }

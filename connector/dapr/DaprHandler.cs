@@ -7,12 +7,12 @@ using System.Collections.Generic;
 
 namespace connector
 {
-    public class DaprHelper
+    public class DaprHandler : IDaprHandler
     {
         private string daprPort;
         private DaprClient client;
 
-        public DaprHelper()
+        public DaprHandler()
         {
             daprPort = Environment.GetEnvironmentVariable("DAPR_PORT") ?? "3500";
             client = new DaprClientBuilder().Build();

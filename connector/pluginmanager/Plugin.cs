@@ -1,26 +1,19 @@
 using System;
 using System.Collections.Generic;
-using System.IO;
-using System.Text.RegularExpressions;
 using System.Threading.Tasks;
-using System.Text;
 using System.Linq;
+using System.Text.RegularExpressions;
+using connector.supervisor;
 
 namespace connector.plugins
 {
     public class Plugin
     {
-        readonly String PluginPath = "./plugins/";
-        readonly String ComponentPath = Environment.GetEnvironmentVariable("COMPONENTS_PATH") ?? "/app/components";
-
-        public Plugin()
-        {
-
-        }
-
         public virtual string Name { get; set; }
 
         public virtual string Direction { get; set; }
+
+        public virtual string ServiceName { get; set; }
 
         public virtual string Filename
         {
@@ -36,12 +29,15 @@ namespace connector.plugins
 
         public virtual IDictionary<string, string> ConfigurationEnvironmentVariables { get; set; }
 
+        public ISupervisorHandler SupervisorHandler { private get; set; }
+
         public virtual async Task<bool> TryLoadAsync()
         {
             this.LoadDefaultConfigurationIfNeeded();
             if (this.AllEnvironmentVariablesSet())
             {
-                if (await this.ParseAndResolveYamlComponentFileAsync())
+                Console.WriteLine($"{this.Name} plugin loaded.");
+                if (await YamlResolver.ParseAndResolveYamlComponentFileAsync(this.Name, this.Filename))
                 {
                     Console.WriteLine($"{this.Name} configured.");
                     return true;
@@ -54,12 +50,17 @@ namespace connector.plugins
 
         private void LoadDefaultConfigurationIfNeeded()
         {
+            var evaluator = new MatchEvaluator(Evaluator);
+
             foreach (var enVar in ConfigurationEnvironmentVariables)
             {
                 if (null == Environment.GetEnvironmentVariable(enVar.Key) && null != enVar.Value)
                 {
-                    Console.WriteLine($"{Name} setting {enVar.Key} to default value: {enVar.Value}");
-                    Environment.SetEnvironmentVariable(enVar.Key, enVar.Value);
+                    var value = Regex.Replace(enVar.Value, @"(\$\{[a-zA-Z\-]+\})", evaluator, RegexOptions.ExplicitCapture);
+
+                    var method = enVar.Value == value ? "default" : "discovered";
+                    Console.WriteLine($"{Name} setting {enVar.Key} to {method} value: {value}");
+                    Environment.SetEnvironmentVariable(enVar.Key, value);
                 }
             }
         }
@@ -86,55 +87,25 @@ namespace connector.plugins
             }
         }
 
-        private async Task<bool> ParseAndResolveYamlComponentFileAsync()
+        private string Evaluator(Match match)
         {
-            Console.WriteLine($"{this.Name} plugin loaded.");
-            var linePattern = @".*?\${(\w+)}.*?";
-            var evaluator = new MatchEvaluator(YamlFileLineEvaluator);
-            var stringBuilder = new StringBuilder();
-
-            try
+            if (SupervisorHandler.ServiceExistsInState(this.ServiceName))
             {
-                using (var reader = new StreamReader(PluginPath + Filename))
+                var serviceDefinition = SupervisorHandler.GetServiceDefinition(this.ServiceName);
+
+                if (("${service-address}" == match.Value) && (null != serviceDefinition.address))
                 {
-                    string currentLine;
-                    while ((currentLine = await reader.ReadLineAsync()) != null)
-                    {
-                        var newLine = Regex.Replace(currentLine, linePattern, evaluator);
-                        stringBuilder.AppendLine(newLine);
-                    }
+                    return serviceDefinition.address;
                 }
 
-                await File.WriteAllTextAsync(ComponentPath + "/" + Filename, stringBuilder.ToString());
-                return true;
-            }
-            catch (Exception exception)
-            {
-                Console.WriteLine($"The file {Filename} could not be parsed:");
-                Console.WriteLine(exception.Message);
-                return false;
-            }
-        }
-
-        private static string YamlFileLineEvaluator(Match lineMatch)
-        {
-            var keyPattern = @"(?<=\$\{)(.*)(?=\})";
-            var replacePattern = @"!ENV \$\{.*\}$";
-            var keyMatch = Regex.Match(lineMatch.Value, keyPattern, RegexOptions.ExplicitCapture);
-            if (!keyMatch.Success)
-            {
-                return lineMatch.Value;
+                if (("${service-port}" == match.Value) && (null != serviceDefinition.port))
+                {
+                    return serviceDefinition.port;
+                }
             }
 
-            var key = keyMatch.Value;
-            var value = Environment.GetEnvironmentVariable(key);
-            // Console.WriteLine($"Replacing {key} with {value}");
-            if (null == value)
-            {
-                return lineMatch.Value;
-            }
+            return match.Value;
 
-            return Regex.Replace(lineMatch.Value, replacePattern, value);
         }
     }
 }

@@ -40,3 +40,4 @@ echo "Starting..."
 
 ./connector &
 balena-idle
+# read -p "hello"
