@@ -5,23 +5,27 @@ using connector.plugins;
 using System.Threading.Tasks;
 using System.Collections.Generic;
 using connector.supervisor;
+using Microsoft.Extensions.DependencyInjection;
+using Serilog;
 
 namespace connector
 {
     public class PluginManager : IPluginManager
     {
-        private ISupervisorHandler _supervisorHandler;
+        private IServiceProvider _services;
+        private ILogger _logger;
 
-        public PluginManager(ISupervisorHandler supervisorHandler)
+        public async Task<List<Plugin>> LoadAsync(IServiceProvider services)
         {
-            _supervisorHandler = supervisorHandler;
-        }
+            if(null == _services)
+            {
+                _services = services;
+                _logger = services.GetRequiredService<ILogger>();
+            }
 
-        public async Task<List<Plugin>> LoadAsync()
-        {
-            await _supervisorHandler.GetTargetStateAsync();
+            await _services.GetRequiredService<ISupervisorHandler>().GetTargetStateAsync();
 
-            Console.WriteLine("Finding plugins");
+            _logger.Information("Finding plugins");
             var loadedPlugins = new List<Plugin> { };
 
             var types = GetApplicationTypes();
@@ -38,11 +42,11 @@ namespace connector
                 if (null != plugin)
                 {
                     loadedPlugins.Add(plugin);
-                    Console.WriteLine($"Adding {plugin.Name} as a {plugin.Direction} element.");
+                    _logger.Information($"Adding {plugin.Name} as a {plugin.Direction} element.");
                 }
             }
 
-            Console.WriteLine("Done loading plugins");
+            _logger.Information("Done loading plugins");
             return loadedPlugins;
         }
 
@@ -51,7 +55,7 @@ namespace connector
             try
             {
                 var instance = (Plugin)Activator.CreateInstance(pluginInstance);
-                instance.SupervisorHandler = _supervisorHandler;
+                instance.Initialise(_services);
                 if (await instance.TryLoadAsync())
                 {
                     return instance;
@@ -59,7 +63,7 @@ namespace connector
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"Failed to load {pluginInstance.Name} with exception: {ex.Message}");
+                _logger.Error($"Failed to load {pluginInstance.Name} with exception: {ex.Message}");
             }
 
             return null;

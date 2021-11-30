@@ -4,20 +4,23 @@ using System.Collections.Generic;
 using System;
 using System.Threading.Tasks;
 using System.Linq;
+using Serilog;
 
 namespace connector.supervisor
 {
     public class SupervisorHandler : ISupervisorHandler
     {
-        private List<ServiceDefinition> _serviceDefinitions;
+        private readonly List<ServiceDefinition> _serviceDefinitions;
+        private readonly ILogger _logger;
 
-        public SupervisorHandler()
+        public SupervisorHandler(ILogger logger)
         {
             _serviceDefinitions = new List<ServiceDefinition>() { };
+            _logger = logger;
         }
         public async Task GetTargetStateAsync()
         {
-            Console.WriteLine("Getting target state from the supervisor");
+            _logger.Information("Getting target state from the supervisor");
             var httpClient = new HttpClient();
             var jsonDocumentOptions = new JsonDocumentOptions { AllowTrailingCommas = true };
             try
@@ -25,23 +28,23 @@ namespace connector.supervisor
                 var supervisorAddress = Environment.GetEnvironmentVariable("BALENA_SUPERVISOR_ADDRESS");
                 if (null == supervisorAddress)
                 {
-                    Console.WriteLine($"Please add the label `io.balena.features.supervisor-api` to your docker-compose file for the connector service.");
+                    _logger.Error($"Please add the label `io.balena.features.supervisor-api` to your docker-compose file for the connector service.");
                     return;
                 }
 
                 var supervisorApiKey = Environment.GetEnvironmentVariable("BALENA_SUPERVISOR_API_KEY");
                 if (null == supervisorAddress)
                 {
-                    Console.WriteLine($"Please add the label `io.balena.features.supervisor-api` to your docker-compose file for the connector service.");
+                    _logger.Error($"Please add the label `io.balena.features.supervisor-api` to your docker-compose file for the connector service.");
                     return;
                 }
 
-                HttpResponseMessage response = await httpClient.GetAsync($"{supervisorAddress}/v2/local/target-state?apikey={supervisorApiKey}");
+                var response = await httpClient.GetAsync($"{supervisorAddress}/v2/local/target-state?apikey={supervisorApiKey}");
                 response.EnsureSuccessStatusCode();
-                string responseBody = await response.Content.ReadAsStringAsync();
+                var responseBody = await response.Content.ReadAsStringAsync();
                 var document = JsonDocument.Parse(responseBody, jsonDocumentOptions);
                 var appId = document.RootElement.GetProperty("state").GetProperty("local").GetProperty("apps").ToString().Split('\"')[1];
-                foreach (JsonElement element in document.RootElement.GetProperty("state").GetProperty("local").GetProperty("apps").GetProperty(appId).GetProperty("services").EnumerateArray())
+                foreach (var element in document.RootElement.GetProperty("state").GetProperty("local").GetProperty("apps").GetProperty(appId).GetProperty("services").EnumerateArray())
                 {
                     var serviceName = GetServiceNameOrDefault(element);
                     if (serviceName == "connector")
@@ -49,7 +52,7 @@ namespace connector.supervisor
                         continue;
                     }
                     var networkMode = GetNetworkModeOrDefault(element);
-                    // Console.WriteLine($"Expose: {element.GetProperty("config").GetProperty("expose")}");
+                    // _logger.Info($"Expose: {element.GetProperty("config").GetProperty("expose")}");
                     var port = GetPortOrDefault(element);
                     var networks = GetNetworksOrDefault(element);
 
@@ -61,20 +64,20 @@ namespace connector.supervisor
 
                     _serviceDefinitions.Add(new ServiceDefinition
                     {
-                        name = serviceName,
-                        port = port,
-                        address = address
+                        Name = serviceName,
+                        Port = port,
+                        Address = address
                     });
                 }
             }
             catch (Exception e)
             {
-                Console.WriteLine("\nException Caught!");
-                Console.WriteLine("Message :{0} ", e.Message);
+                _logger.Error("\nException Caught!");
+                _logger.Error("Message :{0} ", e.Message);
             }
         }
 
-        private string GetAddress(string networkMode, JsonElement networks)
+        private static string GetAddress(string networkMode, JsonElement networks)
         {
             if ("host" == networkMode)
             {
@@ -92,7 +95,7 @@ namespace connector.supervisor
             }
         }
 
-        private string GetServiceNameOrDefault(JsonElement element)
+        private static string GetServiceNameOrDefault(JsonElement element)
         {
             try
             {
@@ -104,7 +107,7 @@ namespace connector.supervisor
             }
         }
 
-        private JsonElement? GetNetworksOrDefault(JsonElement element)
+        private static JsonElement? GetNetworksOrDefault(JsonElement element)
         {
             try
             {
@@ -116,7 +119,7 @@ namespace connector.supervisor
             }
         }
 
-        private string GetNetworkModeOrDefault(JsonElement element)
+        private static string GetNetworkModeOrDefault(JsonElement element)
         {
             try
             {
@@ -128,12 +131,12 @@ namespace connector.supervisor
             }
         }
 
-        private string GetPortOrDefault(JsonElement element)
+        private static string GetPortOrDefault(JsonElement element)
         {
             try
             {
                 var ports = element.GetProperty("config").GetProperty("portMaps").EnumerateArray();
-                if (0 == ports.Count())
+                if (!ports.Any())
                 {
                     return null;
                 }
@@ -149,19 +152,19 @@ namespace connector.supervisor
 
         public bool ServiceExistsInState(string serviceName)
         {
-            return (_serviceDefinitions.Count(s => s.name == serviceName) > 0);
+            return (_serviceDefinitions.Any(s => s.Name == serviceName));
         }
 
         public ServiceDefinition GetServiceDefinition(string serviceName)
         {
-            return _serviceDefinitions.Where(s => s.name == serviceName).FirstOrDefault();
+            return _serviceDefinitions.Where(s => s.Name == serviceName).FirstOrDefault();
         }
     }
 
     public class ServiceDefinition
     {
-        public string name { get; set; }
-        public string address { get; set; }
-        public string port { get; set; }
+        public string Name { get; set; }
+        public string Address { get; set; }
+        public string Port { get; set; }
     }
 }

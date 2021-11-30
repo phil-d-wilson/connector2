@@ -5,66 +5,75 @@ using System.Diagnostics;
 using System.Collections.Generic;
 using connector.plugins;
 using System.Linq;
+using Microsoft.Extensions.DependencyInjection;
+using connector.supervisor;
+using Serilog;
 
 namespace connector
 {
     public class Connector
     {
         private List<Plugin> _plugins;
-        private List<DaprComponent> _daprComponents;
-        private IPluginManager _pluginManager;
-        private IDaprHandler _daprHandler;
+        private IServiceProvider _services;
+        private readonly ILogger _logger;
 
-        public Connector(IPluginManager pluginManager, IDaprHandler daprHelper)
+        public Connector()
         {
-            _pluginManager = pluginManager;
-            _daprHandler = daprHelper;
+            RegisterServices();
+            _logger = _services.GetRequiredService<ILogger>();
+        }
+
+        ~Connector()
+        {
+            DisposeServices();
         }
 
         public async Task RunAsync()
         {
-            _plugins = await _pluginManager.LoadAsync();
+            var pluginManager = _services.GetRequiredService<IPluginManager>();
+            _plugins = await pluginManager.LoadAsync(_services);
 
             if (!StartDaprProcess())
             {
-                Console.WriteLine("Could not start daprd");
+                _logger.Information("Could not start daprd");
+
                 return;
             }
-            _daprComponents = await _daprHandler.GetLoadedComponentsAsync();
+            var daprComponents = await _services.GetRequiredService<IDaprHandler>().GetLoadedComponentsAsync();
 
-            ValidateSourcesAndSinks();
+            ValidateSourcesAndSinks(daprComponents);
         }
 
-        private void ValidateSourcesAndSinks()
+        private void ValidateSourcesAndSinks(List<DaprComponent> daprComponents)
         {
-            ValidateSource("input");
-            ValidateSource("output");
+            ValidateSource(daprComponents, "input");
+            ValidateSource(daprComponents, "output");
         }
 
-        private void ValidateSource(string direction)
+        private void ValidateSource(List<DaprComponent> daprComponents, string direction)
         {
-            Console.WriteLine($"The following are {direction} components:");
+            _logger.Information($"The following are {direction} components:");
             foreach (var plugin in _plugins.Where(p => p.Direction == direction))
             {
-                if (_daprComponents.Where(c => c.name == plugin.Name).Count() == 0)
+                if (!daprComponents.Where(c => c.name == plugin.Name).Any())
                 {
-                    Console.WriteLine($"WARNING: {plugin.Name} was configured but dapr did not successfully load it.");
+                    _logger.Warning($"{plugin.Name} was configured but dapr did not successfully load it.");
                     continue;
                 }
 
-                Console.WriteLine($"{plugin.Name}");
+                _logger.Information($"{plugin.Name}");
                 //DO SOME WIRING HERE
             }
         }
 
-        private static bool StartDaprProcess()
+        private bool StartDaprProcess()
         {
-            Console.WriteLine("Starting dapr");
+            _logger.Information("Starting dapr");
             var dapr = new Process();
             dapr.StartInfo.FileName = @"./daprd";
             dapr.StartInfo.Arguments = @"--components-path /app/components --app-protocol grpc --app-port 50051 --app-id connector";
             bool daprDebug;
-            if (Boolean.TryParse(Environment.GetEnvironmentVariable("HIDE_DAPR_OUTPUT") ?? "true", out daprDebug))
+            if (bool.TryParse(Environment.GetEnvironmentVariable("HIDE_DAPR_OUTPUT") ?? "true", out daprDebug))
             {
                 dapr.StartInfo.RedirectStandardOutput = daprDebug;
             }
@@ -72,6 +81,36 @@ namespace connector
             var proc = dapr.Start();
             Thread.Sleep(10); // need to wait for dapr to load and configure itself
             return proc;
+        }
+
+        private void RegisterServices()
+        {
+            Log.Logger = new LoggerConfiguration()
+               .MinimumLevel.Debug()
+               .WriteTo.Console()
+               .CreateLogger();
+
+            var services = new ServiceCollection();
+            services.AddSingleton<IPluginManager, PluginManager>();
+            services.AddSingleton<ISupervisorHandler, SupervisorHandler>();
+            services.AddSingleton<IDaprHandler, DaprHandler>();
+            services.AddSingleton<IEnvironmentHandler, EnvironmentHandler>();
+            services.AddSingleton(Log.Logger); 
+            var serviceProvider = services.BuildServiceProvider(true);
+            var scope = serviceProvider.CreateScope();
+            _services = scope.ServiceProvider;
+        }
+
+        private void DisposeServices()
+        {
+            if (_services == null)
+            {
+                return;
+            }
+            if (_services is IDisposable disposable)
+            {
+                disposable.Dispose();
+            }
         }
     }
 }

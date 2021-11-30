@@ -6,6 +6,6 @@ namespace connector
 {
     public interface IPluginManager
     {
-        public Task<List<Plugin>> LoadAsync();
+        public Task<List<Plugin>> LoadAsync(System.IServiceProvider services);
     }
 }

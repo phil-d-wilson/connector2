@@ -3,15 +3,24 @@ using System.IO;
 using System.Text.RegularExpressions;
 using System.Threading.Tasks;
 using System.Text;
+using Serilog;
 
 namespace connector
 {
-    public static class YamlResolver
+    public class YamlResolver : IYamlResolver
     {
-        public static async Task<bool> ParseAndResolveYamlComponentFileAsync(string name, string filename)
+        private readonly ILogger _logger;
+
+        public YamlResolver(ILogger logger)
         {
-            String PluginPath = "./plugins/";
-            String ComponentPath = Environment.GetEnvironmentVariable("COMPONENTS_PATH") ?? "/app/components";
+            _logger = logger;
+        }
+
+
+        public async Task<bool> ParseAndResolveYamlComponentFileAsync(string name, string filename)
+        {
+            var PluginPath = "./plugins/";
+            var ComponentPath = Environment.GetEnvironmentVariable("COMPONENTS_PATH") ?? "/app/components";
 
             var linePattern = @".*?\${(\w+)}.*?";
             var evaluator = new MatchEvaluator(YamlFileLineEvaluator);
@@ -34,13 +43,13 @@ namespace connector
             }
             catch (Exception exception)
             {
-                Console.WriteLine($"The file {filename} could not be parsed:");
-                Console.WriteLine(exception.Message);
+                _logger.Error($"The file {filename} could not be parsed:");
+                _logger.Error(exception.Message);
                 return false;
             }
         }
 
-        private static string YamlFileLineEvaluator(Match lineMatch)
+        private string YamlFileLineEvaluator(Match lineMatch)
         {
             var keyPattern = @"(?<=\$\{)(.*)(?=\})";
             var replacePattern = @"!ENV \$\{.*\}$";
@@ -52,7 +61,7 @@ namespace connector
 
             var key = keyMatch.Value;
             var value = Environment.GetEnvironmentVariable(key);
-            // Console.WriteLine($"Replacing {key} with {value}");
+            _logger.Debug($"Replacing {key} with {value}");
             if (null == value)
             {
                 return lineMatch.Value;

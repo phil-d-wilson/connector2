@@ -4,6 +4,7 @@ using Dapr.Client;
 using System.Net.Http;
 using System.Text.Json;
 using System.Collections.Generic;
+using Serilog;
 
 namespace connector
 {
@@ -11,15 +12,17 @@ namespace connector
     {
         private string daprPort;
         private DaprClient client;
+        private ILogger _logger;
 
-        public DaprHandler()
+        public DaprHandler(ILogger logger)
         {
             daprPort = Environment.GetEnvironmentVariable("DAPR_PORT") ?? "3500";
             client = new DaprClientBuilder().Build();
+            _logger = logger;
         }
         public async Task<List<DaprComponent>> GetLoadedComponentsAsync()
         {
-            Console.WriteLine("Dapr running. Finding loaded components");
+            _logger.Information("Dapr running. Finding loaded components");
             List<DaprComponent> components = new List<DaprComponent> { };
             var jsonDocumentOptions = new JsonDocumentOptions
             {
@@ -38,13 +41,13 @@ namespace connector
             }
             catch (HttpRequestException e)
             {
-                Console.WriteLine("\nException Caught!");
-                Console.WriteLine("Message :{0} ", e.Message);
+                _logger.Error("\nException Caught!");
+                _logger.Error("Message :{0} ", e.Message);
             }
 
             if (components.Count == 0)
             {
-                Console.WriteLine("Dapr either failed to start correctly, or loaded no components. Exiting");
+                _logger.Error("Dapr either failed to start correctly, or loaded no components. Exiting");
                 return null;
             }
 
