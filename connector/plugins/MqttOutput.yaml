@@ -3,7 +3,7 @@ kind: Component
 metadata:
   name: MqttOutput
 spec:
-  type: pubsub.mqtt
+  type: bindings.mqtt
   version: v1
   metadata:
   - name: url

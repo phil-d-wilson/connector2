@@ -1,29 +1,35 @@
-using System;
-using System.Linq;
-using System.Reflection;
 using connector.plugins;
-using System.Threading.Tasks;
-using System.Collections.Generic;
 using connector.supervisor;
 using Microsoft.Extensions.DependencyInjection;
 using Serilog;
+using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Reflection;
+using System.Threading.Tasks;
 
 namespace connector
 {
     public class PluginManager : IPluginManager
     {
-        private IServiceProvider _services;
-        private ILogger _logger;
+        private readonly IServiceProvider _services;
+        private readonly ILogger _logger;
+        private readonly ISupervisorHandler _SupervisorHandler;
+        public Guid Id { get; private set; }
+        public List<Plugin> Plugins { get; private set; }
 
-        public async Task<List<Plugin>> LoadAsync(IServiceProvider services)
+        public PluginManager(IServiceProvider services, ILogger logger, ISupervisorHandler supervisorHandler)
         {
-            if(null == _services)
-            {
-                _services = services;
-                _logger = services.GetRequiredService<ILogger>();
-            }
+            _logger = logger;
+            _services = services;
+            _SupervisorHandler = supervisorHandler;
+            Plugins = new List<Plugin>();
+            Id = Guid.NewGuid();
+        }
 
-            await _services.GetRequiredService<ISupervisorHandler>().GetTargetStateAsync();
+        public async Task LoadAsync()
+        {
+            await _SupervisorHandler.GetTargetStateAsync();
 
             _logger.Information("Finding plugins");
             var loadedPlugins = new List<Plugin> { };
@@ -46,16 +52,15 @@ namespace connector
                 }
             }
 
-            _logger.Information("Done loading plugins");
-            return loadedPlugins;
+            _logger.Information($"Loaded {loadedPlugins.Count} plugins");
+            Plugins = loadedPlugins;
         }
 
         private async Task<Plugin> TryLoadingPluginAsync(Type pluginInstance)
         {
             try
             {
-                var instance = (Plugin)Activator.CreateInstance(pluginInstance);
-                instance.Initialise(_services);
+                var instance = (Plugin)ActivatorUtilities.CreateInstance(_services, pluginInstance);
                 if (await instance.TryLoadAsync())
                 {
                     return instance;

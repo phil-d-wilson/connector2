@@ -4,7 +4,7 @@ namespace connector.plugins
 {
     public class MqttOutput : Plugin
     {
-        public MqttOutput()
+        public MqttOutput(IPluginDependencyAggregate dependencyAggregate) : base(dependencyAggregate)
         {
             Name = "MqttOutput";
             Direction = "output";

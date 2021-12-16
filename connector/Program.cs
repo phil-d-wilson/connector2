@@ -2,9 +2,8 @@
 
 namespace connector
 {
-    class Program
-    {
-        
+    public class Program
+    {        
         public static void Main(string[] args)
         {
             MainAsync(args).GetAwaiter().GetResult();
@@ -15,7 +14,5 @@ namespace connector
             var connector = new Connector();
             await connector.RunAsync();
         }
-
-       
     }
 }

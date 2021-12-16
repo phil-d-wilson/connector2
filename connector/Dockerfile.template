@@ -1,14 +1,15 @@
-FROM mcr.microsoft.com/dotnet/sdk:5.0 as build
+FROM mcr.microsoft.com/dotnet/sdk:6.0 as build
 
 WORKDIR /usr/src/app
-COPY *.csproj ./
-COPY ./plugins ./
-COPY ./*.cs ./
 
-RUN dotnet restore --runtime linux-musl-x64
+COPY . .
+RUN rm -rf ./obj
+RUN rm -rf ./bin
+
+
 
 #Build and publish project
-RUN dotnet publish -p:PublishSingleFile=true -r linux-musl-x64 --no-restore --self-contained true -p:PublishTrimmed=True -p:TrimMode=Link -c Release -o /usr/src/app/publish
+RUN dotnet publish -p:PublishSingleFile=true -r linux-musl-x64 --self-contained true -p:PublishTrimmed=True -p:TrimMode=Link -c Release -o /usr/src/app/publish -v quiet
 
 FROM balenalib/%%BALENA_MACHINE_NAME%%-alpine as run
 
@@ -23,9 +24,11 @@ RUN install_packages ca-certificates \
 ENV UDEV=1
 ENV DOTNET_SYSTEM_GLOBALIZATION_INVARIANT 1
 ENV DOTNET_RUNNING_IN_CONTAINER=true
+ENV ASPNETCORE_URLS=http://+:50051
 
 WORKDIR /app
 COPY --from=build /usr/src/app/publish .
+
 COPY ./*.sh ./
 COPY ./VERSION ./
 RUN chmod +x *.sh

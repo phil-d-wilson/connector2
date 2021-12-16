@@ -1,16 +1,15 @@
-version: 2.1
-
+version: '2.1'
 volumes:
-  projects: null
-  settings:
-
-    null
+  projects: 
+  settings: 
 services:
   connector:
     build: ./connector
     privileged: true
     restart: always
     network_mode: host
+    ports:
+      - 8080:8080
     volumes:
       - projects:/app
     labels:
@@ -19,25 +18,11 @@ services:
     environment:
       - AZURE_EH_CONSUMER_GROUP="$Default"
       - AZURE_EH_STORAGE_ACCOUNT="cloudblockstorage"
-      - AZURE_EH_STORAGE_ACCOUNT_KEY="7z7aYOlu+fkQFFVjUq8eYqU9W/eg8/pcwbgWSD3InTWeqUffRWKElI1ym22lMm7CYAJO1fc5l/ry7sljxEjHtA=="
       - AZURE_EH_CONTAINER_NAME="eventhub"
-      - AZURE_EH_CONNECTIONSTRING="Endpoint=sb://cloudblock.servicebus.windows.net/;SharedAccessKeyName=connect;SharedAccessKey=bmNf0eDp47DYBInlE+XVSTVf87JqdEYh6CDWrzpifZw=;EntityPath=cloudblock"
-      - HIDE_DAPR_OUTPUT="false"
-  # code:
-  #   image: balenaplayground/ide:intel-nuc
-  #   ports:
-  #     - 80:80
-  #   volumes:
-  #     - settings:/root
-  #     - projects:/usr/src/projects
-  #   labels:
-  #     io.balena.features.balena-api: '1'
-  #     io.balena.features.supervisor-api: '1'
-  # input:
-  #   image: phildwilson/test-input
-  #   privileged: true
-  #   restart: never
-  #   network_mode: host
+      - AZURE_EH_STORAGE_ACCOUNT_KEY="DEV"
+      - AZURE_EH_CONNECTIONSTRING="DEV"
+      - DEBUG="false"
+      - MQTT_INPUT_SERVER="tcp://localhost:1883"
   mqtt:
     image: eclipse-mosquitto@sha256:307430eaf1e09ee4b7c8dbcd8303545be06431ee35fe43a9abff33d0fc992579
     ports:

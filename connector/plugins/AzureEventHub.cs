@@ -5,7 +5,7 @@ namespace connector.plugins
 {
     public class AzureEventHub : Plugin
     {
-        public AzureEventHub()
+        public AzureEventHub(IPluginDependencyAggregate dependencyAggregate) : base(dependencyAggregate)
         {
             Name = "AzureEventHub";
             Direction = Environment.GetEnvironmentVariable("AZURE_EH_DIRECTION") ?? "output";

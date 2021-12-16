@@ -1,11 +1,10 @@
 using System.Collections.Generic;
-using System;
 
 namespace connector.plugins
 {
     public class MqttInput : Plugin
     {
-        public MqttInput()
+        public MqttInput(IPluginDependencyAggregate dependencyAggregate) : base(dependencyAggregate)
         {
             Name = "MqttInput";
             Direction = "input";

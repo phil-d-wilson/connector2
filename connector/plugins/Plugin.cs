@@ -4,7 +4,6 @@ using System.Threading.Tasks;
 using System.Linq;
 using System.Text.RegularExpressions;
 using connector.supervisor;
-using Microsoft.Extensions.DependencyInjection;
 using Serilog;
 
 namespace connector.plugins
@@ -30,18 +29,17 @@ namespace connector.plugins
         }
 
         public virtual IDictionary<string, string> ConfigurationEnvironmentVariables { get; set; }
-        private IEnvironmentHandler EnvironmentHandler { get; set; }
-        private IServiceProvider _services;
+        private IEnvironmentHandler _environmentHandler;
         private ILogger _logger;
+        private IYamlResolver _yamlResolver;
+        private ISupervisorHandler _SupervisorHandler;
 
-        public void Initialise(IServiceProvider services)
+        public Plugin(IPluginDependencyAggregate dependencyAggregate)
         {
-            if (null == _services)
-            {
-                _services = services;
-                EnvironmentHandler = services.GetService<IEnvironmentHandler>();
-                _logger = services.GetService<ILogger>();
-            }
+            _logger = dependencyAggregate.Logger;
+            _environmentHandler = dependencyAggregate.EnvironmentHandler;
+            _yamlResolver = dependencyAggregate.YamlResolver;
+            _SupervisorHandler = dependencyAggregate.SupervisorHandler;
         }
 
         public async virtual Task<bool> TryLoadAsync()
@@ -50,14 +48,14 @@ namespace connector.plugins
             if (AllEnvironmentVariablesSet())
             {
                 _logger.Information($"{Name} plugin loaded.");
-                if (await _services.GetRequiredService<IYamlResolver>().ParseAndResolveYamlComponentFileAsync(Name, Filename))
+                if (await _yamlResolver.ParseAndResolveYamlComponentFileAsync(Name, Filename))
                 {
                     _logger.Information($"{Name} configured.");
                     return true;
                 }
             }
 
-            _logger.Information($"{Name} not configured.");
+            _logger.Warning($"{Name} not configured.");
             return false;
         }
 
@@ -67,20 +65,20 @@ namespace connector.plugins
 
             foreach (var enVar in ConfigurationEnvironmentVariables)
             {
-                if (null == EnvironmentHandler.GetEnvironmentVariable(enVar.Key) && null != enVar.Value)
+                if (null == _environmentHandler.GetEnvironmentVariable(enVar.Key) && null != enVar.Value)
                 {
                     var value = Regex.Replace(enVar.Value, @"(\$\{[a-zA-Z\-]+\})", evaluator, RegexOptions.ExplicitCapture);
 
                     var method = enVar.Value == value ? "default" : "discovered";
                     _logger.Information($"{Name} setting {enVar.Key} to {method} value: {value}");
-                    EnvironmentHandler.SetEnvironmentVariable(enVar.Key, value);
+                    _environmentHandler.SetEnvironmentVariable(enVar.Key, value);
                 }
             }
         }
 
         private bool AllEnvironmentVariablesSet()
         {
-            var environmentVariables = EnvironmentHandler.GetEnvironmentVariables();
+            var environmentVariables = _environmentHandler.GetEnvironmentVariables();
             var difference = ConfigurationEnvironmentVariables.Keys.Except((IEnumerable<string>)environmentVariables.Keys.Cast<string>().ToList());
 
             WarnIfOnlySomeEnvironmentVariablesAreSet(difference);
@@ -102,10 +100,9 @@ namespace connector.plugins
 
         private string Evaluator(Match match)
         {
-            var supervisorHandler = _services.GetRequiredService<ISupervisorHandler>();
-            if (supervisorHandler.ServiceExistsInState(ServiceName))
+            if (_SupervisorHandler.ServiceExistsInState(ServiceName))
             {
-                var serviceDefinition = supervisorHandler.GetServiceDefinition(ServiceName);
+                var serviceDefinition = _SupervisorHandler.GetServiceDefinition(ServiceName);
 
                 if (("${service-address}" == match.Value) && (null != serviceDefinition.Address))
                 {
@@ -121,5 +118,29 @@ namespace connector.plugins
             return match.Value;
 
         }
+    }
+
+    public class PluginDependencyAggregate : IPluginDependencyAggregate
+    {
+        public IEnvironmentHandler EnvironmentHandler { get; }
+        public IYamlResolver YamlResolver { get; }
+        public ILogger Logger { get; }
+        public ISupervisorHandler SupervisorHandler { get; }
+
+        public PluginDependencyAggregate(IEnvironmentHandler environmentHandler, IYamlResolver yamlResolver, ISupervisorHandler supervisorHandler, ILogger logger )
+        {
+            EnvironmentHandler = environmentHandler;
+            YamlResolver = yamlResolver;
+            SupervisorHandler = supervisorHandler;
+            Logger = logger;
+        }
+    }
+
+    public interface IPluginDependencyAggregate
+    {
+        public IEnvironmentHandler EnvironmentHandler { get; }
+        public IYamlResolver YamlResolver { get; }
+        public ILogger Logger { get; }
+        public ISupervisorHandler SupervisorHandler { get; }
     }
 }

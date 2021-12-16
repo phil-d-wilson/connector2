@@ -3,7 +3,7 @@ kind: Component
 metadata:
   name: MqttInput
 spec:
-  type: pubsub.mqtt
+  type: bindings.mqtt
   version: v1
   ignoreErrors: true
   metadata:
@@ -13,3 +13,5 @@ spec:
     value: !ENV ${MQTT_INPUT_TOPIC}
   - name: qos
     value: !ENV ${MQTT_INPUT_QOS}
+  - name: consumerID
+    value: "{uuid}"

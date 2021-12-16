@@ -1,12 +1,12 @@
 using connector.plugins;
 using connector.supervisor;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
+using Serilog;
+using System;
 using System.Collections.Generic;
 using System.Threading.Tasks;
 using Telerik.JustMock;
-using System;
-using Microsoft.Extensions.DependencyInjection;
-using Serilog;
 
 namespace connector.testing
 {
@@ -24,7 +24,7 @@ namespace connector.testing
             testFixture.SetMockEnvironmentVariables(testEnvironmentVariables);            
 
             var testPlugin = CreateTestPlugin("Test");
-            testPlugin.Initialise(testFixture.ServiceProvider);
+            //testPlugin.Initialise(testFixture.ServiceProvider);
             var instance = new PrivateAccessor(testPlugin);
             var result = instance.CallMethod("AllEnvironmentVariablesSet");
 
@@ -44,7 +44,7 @@ namespace connector.testing
             testFixture.SetMockEnvironmentVariables(testEnvironmentVariables);
 
             var testPlugin = CreateTestPlugin("Test");
-            testPlugin.Initialise(testFixture.ServiceProvider);
+            //testPlugin.Initialise(testFixture.ServiceProvider);
             var instance = new PrivateAccessor(testPlugin);
             var result = instance.CallMethod("AllEnvironmentVariablesSet");
 
@@ -61,7 +61,7 @@ namespace connector.testing
             Mock.Arrange(() => testFixture.MockEnvironmentHandler.GetEnvironmentVariable(Arg.AnyString)).Returns((string)null);
 
             var testPlugin = CreateTestPlugin("Test");
-            testPlugin.Initialise(testFixture.ServiceProvider);
+            //testPlugin.Initialise(testFixture.ServiceProvider);
             var instance = new PrivateAccessor(testPlugin);
            instance.CallMethod("LoadDefaultConfigurationIfNeeded");
 
@@ -90,7 +90,7 @@ namespace connector.testing
             Mock.Arrange(() => testFixture.MockYamlResolver.ParseAndResolveYamlComponentFileAsync(name, filename)).Returns(Task.FromResult(true));
 
             var testPlugin = CreateTestPlugin(name);
-            testPlugin.Initialise(testFixture.ServiceProvider);
+            //testPlugin.Initialise(testFixture.ServiceProvider);
 
             Assert.IsTrue(await testPlugin.TryLoadAsync());
             Mock.Assert(() => testFixture.MockYamlResolver.ParseAndResolveYamlComponentFileAsync(name,filename), Occurs.Once());
@@ -112,7 +112,7 @@ namespace connector.testing
             testFixture.SetMockEnvironmentVariables(testEnvironmentVariables);
 
             var testPlugin = CreateTestPlugin(name);
-            testPlugin.Initialise(testFixture.ServiceProvider);
+            //testPlugin.Initialise(testFixture.ServiceProvider);
 
             Assert.IsFalse(await testPlugin.TryLoadAsync());
             Mock.Assert(() => testFixture.MockYamlResolver.ParseAndResolveYamlComponentFileAsync(name, filename), Occurs.Never());
@@ -136,7 +136,7 @@ namespace connector.testing
             Mock.Arrange(() => testFixture.MockEnvironmentHandler.GetEnvironmentVariable("foo")).Returns("bar");
 
             var testPlugin = CreateTestPlugin(name);
-            testPlugin.Initialise(testFixture.ServiceProvider);
+            //testPlugin.Initialise(testFixture.ServiceProvider);
 
             Assert.IsFalse(await testPlugin.TryLoadAsync());
             Mock.Assert(() => testFixture.MockEnvironmentHandler.SetEnvironmentVariable("foo2", "bar2"), Occurs.Once());
@@ -169,7 +169,7 @@ namespace connector.testing
 
             var testPlugin = CreateTestPlugin(name);
             testPlugin.ConfigurationEnvironmentVariables.Add("foo3", "http://${service-address}:${service-port}");
-            testPlugin.Initialise(testFixture.ServiceProvider);
+            //testPlugin.Initialise(testFixture.ServiceProvider);
 
             Assert.IsFalse(await testPlugin.TryLoadAsync());
             Mock.Assert(() => testFixture.MockEnvironmentHandler.SetEnvironmentVariable("foo3", @"http://balena:8080"), Occurs.Once());
@@ -177,17 +177,19 @@ namespace connector.testing
 
         private static Plugin CreateTestPlugin(string name)
         {
-           var testPlugin = new Plugin
-            {
-                ConfigurationEnvironmentVariables = new Dictionary<string, string>() { },
-                Name = name,
-                ServiceName = "Test"
+            //var testPlugin = new Plugin
+            // {
+            //     ConfigurationEnvironmentVariables = new Dictionary<string, string>() { },
+            //     Name = name,
+            //     ServiceName = "Test"
 
-            };
-            testPlugin.ConfigurationEnvironmentVariables.Add("foo", "bar");
-            testPlugin.ConfigurationEnvironmentVariables.Add("foo2", "bar2");
-            
-            return testPlugin;
+            // };
+            // testPlugin.ConfigurationEnvironmentVariables.Add("foo", "bar");
+            // testPlugin.ConfigurationEnvironmentVariables.Add("foo2", "bar2");
+
+            // return testPlugin;
+
+            return null;
         }
     }
 
