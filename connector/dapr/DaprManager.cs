@@ -12,12 +12,14 @@ namespace connector
     public class DaprManager : IDaprManager
     {
         private readonly string daprPort;
+        private readonly string daprGrpcPort;
         private readonly ILogger _logger;
         private readonly bool _debug;
 
         public DaprManager(ILogger logger)
         {
-            daprPort = Environment.GetEnvironmentVariable("DAPR_PORT") ?? "3500";
+            daprPort = Environment.GetEnvironmentVariable("DAPR_HTTP_PORT") ?? "3500";
+            daprGrpcPort = Environment.GetEnvironmentVariable("DAPR_GRPC_PORT") ?? "50001";
             _debug = (Environment.GetEnvironmentVariable("DEBUG") ?? "false") == "true";
             _logger = logger;
         }
@@ -27,13 +29,14 @@ namespace connector
             _logger.Information("Starting dapr");
             var dapr = new ProcessStartInfo("dapr")
             {
-                Arguments = $"run --components-path /app/components --app-protocol grpc --app-port 50051 --dapr-http-port {daprPort} --app-id connector"
+                Arguments = $"run --components-path /app/components --app-protocol grpc --app-port 50051 --dapr-http-port {daprPort} --dapr-grpc-port {daprGrpcPort} --app-id connector"
             };
             
-            dapr.RedirectStandardOutput = !_debug;
+            dapr.RedirectStandardOutput = _debug;
 
             var proc = Process.Start(dapr);
-            Thread.Sleep(2000); // need to wait for dapr to load and configure itself
+            //TODO: this sleep does not work - the whole thread blocks, including dapr finishing initialisation
+            Thread.Sleep(5000); // need to wait for dapr to load and configure itself
 
             dapr = new ProcessStartInfo("dapr")
             {

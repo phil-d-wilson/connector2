@@ -9,6 +9,7 @@
     <PackageReference Include="Google.Protobuf" Version="3.19.1" />
     <PackageReference Include="Grpc" Version="2.42.0" />
     <PackageReference Include="Grpc.AspNetCore" Version="2.41.0" />
+    <PackageReference Include="Grpc.Net.Client" Version="2.41.0" />
     <PackageReference Include="Grpc.Tools" Version="2.42.0">
       <PrivateAssets>all</PrivateAssets>
       <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
@@ -25,8 +26,8 @@
   </ItemGroup>
 
 	<ItemGroup>
-		<Protobuf Include="dapr\proto\common\v1\common.proto" ProtoRoot=".\" GrpcServices="Client" />
-		<Protobuf Include="dapr\proto\runtime\v1\dapr.proto" ProtoRoot=".\" GrpcServices="Server" Access="Public" ProtoCompile="True" CompileOutputs="True" Generator="MSBuild:Compile" OutputDir="obj\Debug\net6.0\" />
+		<Protobuf Include="dapr\proto\common\v1\common.proto" ProtoRoot=".\" GrpcServices="Both" />
+		<Protobuf Include="dapr\proto\runtime\v1\dapr.proto" ProtoRoot=".\" GrpcServices="Client" Access="Public" ProtoCompile="True" CompileOutputs="True" Generator="MSBuild:Compile" OutputDir="obj\Debug\net6.0\" />
 		<Protobuf Include="dapr\proto\runtime\v1\appcallback.proto" ProtoRoot=".\" GrpcServices="Server" Access="Public" ProtoCompile="True" CompileOutputs="True" Generator="MSBuild:Compile" OutputDir="obj\Debug\net6.0\" />
 	</ItemGroup>
 

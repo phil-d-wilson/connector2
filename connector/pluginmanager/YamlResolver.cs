@@ -1,9 +1,9 @@
+using Serilog;
 using System;
 using System.IO;
+using System.Text;
 using System.Text.RegularExpressions;
 using System.Threading.Tasks;
-using System.Text;
-using Serilog;
 
 namespace connector
 {
@@ -16,12 +16,10 @@ namespace connector
             _logger = logger;
         }
 
-
         public async Task<bool> ParseAndResolveYamlComponentFileAsync(string name, string filename)
         {
             var PluginPath = "./plugins/";
             var ComponentPath = Environment.GetEnvironmentVariable("COMPONENTS_PATH") ?? "/app/components";
-
             var linePattern = @".*?\${(\w+)}.*?";
             var evaluator = new MatchEvaluator(YamlFileLineEvaluator);
             var stringBuilder = new StringBuilder();

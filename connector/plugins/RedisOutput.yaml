@@ -1,0 +1,16 @@
+apiVersion: dapr.io/v1alpha1
+kind: Component
+metadata:
+  name: RedisOutput
+spec:
+  type: bindings.redis
+  version: v1
+  metadata:
+  - name: redisHost
+    value: !ENV ${REDIS_OUTPUT_HOST}
+  - name: redisUsername
+    value: !ENV ${REDIS_OUTPUT_USERNAME}
+  - name: redisPassword
+    value: !ENV ${REDIS_OUTPUT_PASSWORD}
+  - name: enableTLS
+    value: false

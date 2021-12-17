@@ -1,3 +1,4 @@
+using connector.dapr;
 using connector.plugins;
 using connector.supervisor;
 using Microsoft.AspNetCore.Builder;
@@ -19,14 +20,17 @@ namespace connector
         private List<Plugin> _plugins;
         private readonly ILogger _logger;
         private WebApplication _connectorServer;
-        private LoggingLevelSwitch _levelSwitch;
+        private readonly LoggingLevelSwitch _levelSwitch;
+        private readonly bool _debug = false;
 
         public Connector()
         {
             _levelSwitch = new LoggingLevelSwitch { MinimumLevel = LogEventLevel.Information};
-            if((Environment.GetEnvironmentVariable("DEBUG") ?? "false") == "true")
+            _debug = (Environment.GetEnvironmentVariable("DEBUG") ?? "false") == "true";
+            if (_debug)
             {
-                _levelSwitch.MinimumLevel = LogEventLevel.Debug;
+                _logger.Information($"Setting debug level to DEBUG");
+                _levelSwitch.MinimumLevel = LogEventLevel.Verbose;
             }
             
             RegisterServices();
@@ -50,7 +54,7 @@ namespace connector
             var daprComponents = await daprManager.GetLoadedComponentsAsync();
 
             ValidateSourcesAndSinks(daprComponents);
-            RunGrpcService();
+            await RunGrpcService();
         }
 
         private void ValidateSourcesAndSinks(List<DaprComponent> daprComponents)
@@ -85,9 +89,11 @@ namespace connector
                 )
                .CreateLogger();
 
-
-            var builder = WebApplication.CreateBuilder(new string[] { });
-            builder.Logging.AddSerilog();
+            var builder = WebApplication.CreateBuilder(Array.Empty<string>());
+            if (_debug)
+            {
+                builder.Logging.AddSerilog();
+            }
             builder.WebHost.ConfigureKestrel((context, options) =>
             {
                 options.ListenAnyIP(50051, listenOptions =>
@@ -103,17 +109,16 @@ namespace connector
             builder.Services.AddSingleton<IYamlResolver, YamlResolver>();
             builder.Services.AddSingleton(Log.Logger);
             builder.Services.AddSingleton<IPluginDependencyAggregate, PluginDependencyAggregate>();
+            builder.Services.AddSingleton<IOutputClient, OutputClient>();
             var serviceProvider = builder.Services.BuildServiceProvider(true);
 
             _connectorServer = builder.Build();
-            _connectorServer.MapGrpcService<ConnectorServer>();
+            _connectorServer.MapGrpcService<InputServer>();
         }
 
-        private void RunGrpcService()
+        private async Task RunGrpcService()
         {
-           _connectorServer.Run();
+           await _connectorServer.RunAsync();
         }
     }
-
-  
 }

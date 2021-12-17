@@ -1,4 +1,5 @@
-﻿using Dapr.AppCallback.Autogen.Grpc.v1;
+﻿using connector.dapr;
+using Dapr.AppCallback.Autogen.Grpc.v1;
 using Dapr.Client.Autogen.Grpc.v1;
 using Google.Protobuf;
 using Google.Protobuf.Collections;
@@ -11,16 +12,19 @@ using System.Threading.Tasks;
 
 namespace connector
 {
-    public class ConnectorServer : AppCallback.AppCallbackBase
+    public class InputServer : AppCallback.AppCallbackBase
     {
         private readonly ILogger _logger;
         private readonly IPluginManager _pluginManager;
+        private readonly IOutputClient _outputClient;
 
-        public ConnectorServer(ILogger logger, IPluginManager pluginManager)
+        public InputServer(ILogger logger, IPluginManager pluginManager, IOutputClient outputClient)
         {
             _logger = logger;
             _logger.Debug("Constructing gRPC AppCallback service");
             _pluginManager = pluginManager;
+            _logger.Debug($"gRPC service has {_pluginManager.Plugins.Count} plugins");
+            _outputClient = outputClient;
         }
 
         public override Task<ListTopicSubscriptionsResponse> ListTopicSubscriptions(Empty request, ServerCallContext context)
@@ -33,7 +37,6 @@ namespace connector
         {
             byte[] bytes;
             var bindings = new RepeatedField<string>();
-            _logger.Debug($"gRPC service has {_pluginManager.Plugins.Count} plugins");
 
             foreach (var plugin in _pluginManager.Plugins.Where(p => p.Direction == "input"))
             {
@@ -69,10 +72,11 @@ namespace connector
             return Task.FromResult(new TopicEventResponse());
         }
 
-        public override Task<BindingEventResponse> OnBindingEvent(BindingEventRequest request, ServerCallContext context)
+        public async override Task<BindingEventResponse> OnBindingEvent(BindingEventRequest request, ServerCallContext context)
         {
             _logger.Debug($"Event from {request.Name} component: {request.Data.ToStringUtf8()}");
-            return Task.FromResult(new BindingEventResponse());
+            await _outputClient.SendMessageAsync(request);
+            return new BindingEventResponse();
         }
 
     }

@@ -29,10 +29,10 @@ namespace connector.plugins
         }
 
         public virtual IDictionary<string, string> ConfigurationEnvironmentVariables { get; set; }
-        private IEnvironmentHandler _environmentHandler;
-        private ILogger _logger;
-        private IYamlResolver _yamlResolver;
-        private ISupervisorHandler _SupervisorHandler;
+        private readonly IEnvironmentHandler _environmentHandler;
+        private readonly ILogger _logger;
+        private readonly IYamlResolver _yamlResolver;
+        private readonly ISupervisorHandler _SupervisorHandler;
 
         public Plugin(IPluginDependencyAggregate dependencyAggregate)
         {
@@ -79,7 +79,7 @@ namespace connector.plugins
         private bool AllEnvironmentVariablesSet()
         {
             var environmentVariables = _environmentHandler.GetEnvironmentVariables();
-            var difference = ConfigurationEnvironmentVariables.Keys.Except((IEnumerable<string>)environmentVariables.Keys.Cast<string>().ToList());
+            var difference = ConfigurationEnvironmentVariables.Keys.Except(environmentVariables.Keys.Cast<string>().ToList());
 
             WarnIfOnlySomeEnvironmentVariablesAreSet(difference);
 
@@ -88,7 +88,7 @@ namespace connector.plugins
 
         private void WarnIfOnlySomeEnvironmentVariablesAreSet(IEnumerable<string> difference)
         {
-            if ((difference.Any()) && (difference.Count() < ConfigurationEnvironmentVariables.Keys.Count))
+            if (difference.Any() && (difference.Count() < ConfigurationEnvironmentVariables.Keys.Count))
             {
                 _logger.Warning($"Some environment variables configuring {Name} detected, but not all. The following are missing:");
                 foreach (var enVar in difference)
@@ -116,7 +116,6 @@ namespace connector.plugins
             }
 
             return match.Value;
-
         }
     }
 
@@ -135,7 +134,6 @@ namespace connector.plugins
             Logger = logger;
         }
     }
-
     public interface IPluginDependencyAggregate
     {
         public IEnvironmentHandler EnvironmentHandler { get; }
