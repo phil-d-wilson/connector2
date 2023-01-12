@@ -1,9 +1,6 @@
-using System;
 using System.Collections.Generic;
 using System.Threading.Tasks;
 using System.Linq;
-using System.Text.RegularExpressions;
-using connector.supervisor;
 using Serilog;
 
 namespace connector.plugins
@@ -34,14 +31,12 @@ namespace connector.plugins
         private readonly IEnvironmentHandler _environmentHandler;
         internal readonly ILogger Logger;
         private readonly IYamlResolver _yamlResolver;
-        private readonly ISupervisorHandler _SupervisorHandler;
 
         public Plugin(IPluginDependencyAggregate dependencyAggregate)
         {
             Logger = dependencyAggregate.Logger;
             _environmentHandler = dependencyAggregate.EnvironmentHandler;
             _yamlResolver = dependencyAggregate.YamlResolver;
-            _SupervisorHandler = dependencyAggregate.SupervisorHandler;
 
             OutputOperation = "create";
         }
@@ -71,8 +66,6 @@ namespace connector.plugins
 
         private void LoadDefaultConfigurationIfNeeded()
         {
-            var supervisorDiscovery = new MatchEvaluator(SupervisorDiscovery);
-
             foreach (var enVar in ConfigurationEnvironmentVariables)
             {
                 Logger.Debug($"Assessing plugin environment variable: {enVar.Key}");
@@ -83,22 +76,8 @@ namespace connector.plugins
                     //If there is a value set in the plugin itself
                     if (null != enVar.Value)
                     {
-                        Logger.Debug($"{enVar.Key} has a default value of {enVar.Value}.");
-                        //We need to see if the default, is actually a template value which we can try to auto-discover via the supervisor state
-                        string value;
-                        try
-                        {
-                            value = Regex.Replace(enVar.Value, @"(\$\{[a-zA-Z\-]+\})", supervisorDiscovery, RegexOptions.ExplicitCapture);
-                        }
-                        catch(KeyNotFoundException ex)
-                        {
-                            Logger.Debug($"{enVar.Key} matched auto-discovery pattern, but no service matched. Value not set.");
-                            continue;
-                        }
-
-                        var method = enVar.Value == value ? "default" : "discovered";
-                        Logger.Information($"{Name} setting {enVar.Key} to {method} value: {value}");
-                        _environmentHandler.SetEnvironmentVariable(enVar.Key, value);
+                        Logger.Information($"{enVar.Key} has a default value of {enVar.Value}.");
+                        _environmentHandler.SetEnvironmentVariable(enVar.Key, enVar.Value);
                     }
                     else
                     {
@@ -133,34 +112,6 @@ namespace connector.plugins
                 }
             }
         }
-
-        private string SupervisorDiscovery(Match match)
-        {
-            if(null == ServiceName)
-            {
-                //nothing to match
-                // return null;
-                throw new KeyNotFoundException();
-            }
-
-            Logger.Debug($"{match.Value} matches the auto-discovery pattern. Checking for service {ServiceName}");
-            if (_SupervisorHandler.ServiceExistsInState(ServiceName))
-            {
-                var serviceDefinition = _SupervisorHandler.GetServiceDefinition(ServiceName);
-
-                if (("${service-address}" == match.Value) && (null != serviceDefinition.Address))
-                {
-                    return serviceDefinition.Address;
-                }
-
-                if (("${service-port}" == match.Value) && (null != serviceDefinition.Port))
-                {
-                    return serviceDefinition.Port;
-                }
-            }
-
-            throw new KeyNotFoundException();
-        }
     }
 
     public class PluginDependencyAggregate : IPluginDependencyAggregate
@@ -168,13 +119,11 @@ namespace connector.plugins
         public IEnvironmentHandler EnvironmentHandler { get; }
         public IYamlResolver YamlResolver { get; }
         public ILogger Logger { get; }
-        public ISupervisorHandler SupervisorHandler { get; }
 
-        public PluginDependencyAggregate(IEnvironmentHandler environmentHandler, IYamlResolver yamlResolver, ISupervisorHandler supervisorHandler, ILogger logger)
+        public PluginDependencyAggregate(IEnvironmentHandler environmentHandler, IYamlResolver yamlResolver, ILogger logger)
         {
             EnvironmentHandler = environmentHandler;
             YamlResolver = yamlResolver;
-            SupervisorHandler = supervisorHandler;
             Logger = logger;
         }
     }
@@ -184,6 +133,5 @@ namespace connector.plugins
         public IEnvironmentHandler EnvironmentHandler { get; }
         public IYamlResolver YamlResolver { get; }
         public ILogger Logger { get; }
-        public ISupervisorHandler SupervisorHandler { get; }
     }
 }

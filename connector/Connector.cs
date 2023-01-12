@@ -1,6 +1,5 @@
 using connector.dapr;
 using connector.plugins;
-using connector.supervisor;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Server.Kestrel.Core;
@@ -109,7 +108,6 @@ namespace connector
                 });
                 builder.Services.AddGrpc();
                 builder.Services.AddSingleton<IPluginManager, PluginManager>();
-                builder.Services.AddSingleton<ISupervisorHandler, SupervisorHandler>();
                 builder.Services.AddSingleton<IDaprManager, DaprManager>();
                 builder.Services.AddSingleton<IEnvironmentHandler, EnvironmentHandler>();
                 builder.Services.AddSingleton<IYamlResolver, YamlResolver>();

@@ -12,7 +12,7 @@ namespace connector.plugins
             Direction = "output";
             ServiceName = "redis";
             ConfigurationEnvironmentVariables = new Dictionary<string, string> {
-                {"REDIS_HOST", "${service-address}:${service-port}"},
+                {"REDIS_HOST", "localhost:6379"},
                 {"REDIS_USERNAME", " "},
                 {"REDIS_PASSWORD", " "}
             };

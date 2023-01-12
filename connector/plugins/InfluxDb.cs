@@ -11,7 +11,7 @@ namespace connector.plugins
             Direction = "output";
             ServiceName = "InfluxDb";
             ConfigurationEnvironmentVariables = new Dictionary<string, string> {
-                {"INFLUX_URL", "http://${service-address}:${service-port}"},
+                {"INFLUX_URL", "http://localhost:8086"},
                 {"INFLUX_TOKEN", "balena:balena"},
                 {"INFLUX_BUCKET", "balena/autogen"},
                 {"INFLUX_ORG", "balena"}

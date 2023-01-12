@@ -14,7 +14,7 @@ services:
     environment:
       - DEBUG=true
       - AZURE_BLOB_STORAGE_ACCOUNT_NAME=daprblockstorage
-      - AZURE_BLOB_STORAGE_ACCOUNT_KEY=8hSrSzitwV8uhH+kEO4CEk8Voxm6C4FPW8XEDYr+e9ij7lJILregaJTp//4UX0I0BUa82TsG/wUm+AStUZcCdg==
+      - AZURE_BLOB_STORAGE_ACCOUNT_KEY=
       - AZURE_BLOB_CONTAINER_NAME=dapr-block
   mqtt:
     image: eclipse-mosquitto@sha256:307430eaf1e09ee4b7c8dbcd8303545be06431ee35fe43a9abff33d0fc992579
