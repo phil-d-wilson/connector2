@@ -11,8 +11,8 @@ namespace connector
     {
         public IDictionary GetEnvironmentVariables();
 
-        public string? GetEnvironmentVariable(string key);
+        public string GetEnvironmentVariable(string key);
 
-        public void SetEnvironmentVariable(string key, string? value);
+        public void SetEnvironmentVariable(string key, string value);
     }
 }

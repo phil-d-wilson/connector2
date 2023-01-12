@@ -73,6 +73,7 @@ namespace connector
 
             return null;
         }
+
         private static IEnumerable<Type> GetApplicationTypes()
         {
             var types = (from t in Assembly.GetExecutingAssembly().GetTypes()

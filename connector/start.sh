@@ -15,7 +15,7 @@ echo "Intelligently connecting data sources with data sinks"
 
 if [ "x$DAPR_DEBUG" != "x" ]
 then
-    DAPR_LOGLEVEL="--log-level debug"
+    DAPR_LOGLEVEL="--log-level warn"
 fi
 
 # Place dapr components on tmpfs based file system so they don't remain on disk.
@@ -24,20 +24,10 @@ component_dir=/app/components
 mv $component_dir /tmp
 mkdir $component_dir
 mount -t tmpfs -o mode=711 tmpfs $component_dir
-# mv /tmp/components $component_dir || true 
 rm -rf /tmp/components
 
 # Allow time for networking and MQTT to stabilize.
 sleep 10
-echo "Starting..."
-
-# # Initialize dapr services from plugins
-# python3 ./src/autoconfigure.py
-# sleep 3
-# # Run dapr sidecar, where main app below listens to sidecar via a gRPC server
-# daprd $DAPR_LOGLEVEL --components-path /app/components --app-protocol grpc --app-port 50051 --app-id $1 &
-# sleep 3
 
 ./connector &
 balena-idle
-# read -p "hello"

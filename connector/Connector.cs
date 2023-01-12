@@ -25,16 +25,17 @@ namespace connector
 
         public Connector()
         {
-            _levelSwitch = new LoggingLevelSwitch { MinimumLevel = LogEventLevel.Information};
+            _levelSwitch = new LoggingLevelSwitch { MinimumLevel = LogEventLevel.Information };
             _debug = (Environment.GetEnvironmentVariable("DEBUG") ?? "false") == "true";
             if (_debug)
             {
-                _logger.Information($"Setting debug level to DEBUG");
+                Console.WriteLine("Setting debug level to DEBUG");
                 _levelSwitch.MinimumLevel = LogEventLevel.Verbose;
             }
-            
+
             RegisterServices();
             _logger = _connectorServer.Services.GetRequiredService<ILogger>();
+            _logger.Verbose("DEBUG set, logging will be Verbose");
         }
 
         public async Task RunAsync()
@@ -52,6 +53,11 @@ namespace connector
             }
 
             var daprComponents = await daprManager.GetLoadedComponentsAsync();
+            if (null == daprComponents)
+            {
+                _logger.Error("Dapr failed to load.");
+                return;
+            }
 
             ValidateSourcesAndSinks(daprComponents);
             await RunGrpcService();
@@ -68,7 +74,7 @@ namespace connector
             _logger.Information($"The following are {direction} components:");
             foreach (var plugin in _plugins.Where(p => p.Direction == direction))
             {
-                if (!daprComponents.Where(c => c.Name == plugin.Name).Any())
+                if (!daprComponents.Where(c => c.name == plugin.Name).Any())
                 {
                     _logger.Warning($"{plugin.Name} was configured but dapr did not successfully load it.");
                     continue;
@@ -89,36 +95,42 @@ namespace connector
                 )
                .CreateLogger();
 
-            var builder = WebApplication.CreateBuilder(Array.Empty<string>());
-            if (_debug)
+            try
             {
-                builder.Logging.AddSerilog();
-            }
-            builder.WebHost.ConfigureKestrel((context, options) =>
-            {
-                options.ListenAnyIP(50051, listenOptions =>
+                var builder = WebApplication.CreateBuilder(Array.Empty<string>());
+                if (_debug)
                 {
-                    listenOptions.Protocols = HttpProtocols.Http2;
+                    builder.Logging.AddSerilog();
+                }
+                builder.WebHost.ConfigureKestrel((context, options) => {
+                    options.ListenAnyIP(50051, listenOptions => {
+                        listenOptions.Protocols = HttpProtocols.Http2;
+                    });
                 });
-            });
-            builder.Services.AddGrpc();
-            builder.Services.AddSingleton<IPluginManager, PluginManager>();
-            builder.Services.AddSingleton<ISupervisorHandler, SupervisorHandler>();
-            builder.Services.AddSingleton<IDaprManager, DaprManager>();
-            builder.Services.AddSingleton<IEnvironmentHandler, EnvironmentHandler>();
-            builder.Services.AddSingleton<IYamlResolver, YamlResolver>();
-            builder.Services.AddSingleton(Log.Logger);
-            builder.Services.AddSingleton<IPluginDependencyAggregate, PluginDependencyAggregate>();
-            builder.Services.AddSingleton<IOutputClient, OutputClient>();
-            var serviceProvider = builder.Services.BuildServiceProvider(true);
+                builder.Services.AddGrpc();
+                builder.Services.AddSingleton<IPluginManager, PluginManager>();
+                builder.Services.AddSingleton<ISupervisorHandler, SupervisorHandler>();
+                builder.Services.AddSingleton<IDaprManager, DaprManager>();
+                builder.Services.AddSingleton<IEnvironmentHandler, EnvironmentHandler>();
+                builder.Services.AddSingleton<IYamlResolver, YamlResolver>();
+                builder.Services.AddSingleton(Log.Logger);
+                builder.Services.AddSingleton<IPluginDependencyAggregate, PluginDependencyAggregate>();
+                builder.Services.AddSingleton<IOutputClient, OutputClient>();
+                var serviceProvider = builder.Services.BuildServiceProvider(true);
 
-            _connectorServer = builder.Build();
-            _connectorServer.MapGrpcService<InputServer>();
+                _connectorServer = builder.Build();
+                _connectorServer.MapGrpcService<InputServer>();
+            }
+            catch(Exception ex)
+            {
+                Log.Logger.Error($"Connector failed to load. Error message: {ex.Message}");
+                return;
+            }
         }
 
         private async Task RunGrpcService()
         {
-           await _connectorServer.RunAsync();
+            await _connectorServer.RunAsync();
         }
     }
 }

@@ -16,6 +16,8 @@ namespace connector.plugins
 
         public virtual string ServiceName { get; set; }
 
+        public virtual string OutputOperation { get; set; }
+
         public virtual string Filename
         {
             get
@@ -30,48 +32,82 @@ namespace connector.plugins
 
         public virtual IDictionary<string, string> ConfigurationEnvironmentVariables { get; set; }
         private readonly IEnvironmentHandler _environmentHandler;
-        private readonly ILogger _logger;
+        internal readonly ILogger Logger;
         private readonly IYamlResolver _yamlResolver;
         private readonly ISupervisorHandler _SupervisorHandler;
 
         public Plugin(IPluginDependencyAggregate dependencyAggregate)
         {
-            _logger = dependencyAggregate.Logger;
+            Logger = dependencyAggregate.Logger;
             _environmentHandler = dependencyAggregate.EnvironmentHandler;
             _yamlResolver = dependencyAggregate.YamlResolver;
             _SupervisorHandler = dependencyAggregate.SupervisorHandler;
+
+            OutputOperation = "create";
+        }
+
+        public virtual List<KeyValuePair<string, string>> GetMetadata(string input)
+        {
+            return new List<KeyValuePair<string, string>>();
         }
 
         public async virtual Task<bool> TryLoadAsync()
         {
+            Logger.Debug($"Trying to load plugin: {Name}");
             LoadDefaultConfigurationIfNeeded();
             if (AllEnvironmentVariablesSet())
             {
-                _logger.Information($"{Name} plugin loaded.");
+                Logger.Debug($"{Name} plugin found.");
                 if (await _yamlResolver.ParseAndResolveYamlComponentFileAsync(Name, Filename))
                 {
-                    _logger.Information($"{Name} configured.");
+                    Logger.Information($"{Name} configured and loaded.");
                     return true;
                 }
             }
 
-            _logger.Warning($"{Name} not configured.");
+            Logger.Information($"{Name} not configured.");
             return false;
         }
 
         private void LoadDefaultConfigurationIfNeeded()
         {
-            var evaluator = new MatchEvaluator(Evaluator);
+            var supervisorDiscovery = new MatchEvaluator(SupervisorDiscovery);
 
             foreach (var enVar in ConfigurationEnvironmentVariables)
             {
-                if (null == _environmentHandler.GetEnvironmentVariable(enVar.Key) && null != enVar.Value)
+                Logger.Debug($"Assessing plugin environment variable: {enVar.Key}");
+                //If the environment variable has not been set at a fleet or device level
+                if (null == _environmentHandler.GetEnvironmentVariable(enVar.Key))
                 {
-                    var value = Regex.Replace(enVar.Value, @"(\$\{[a-zA-Z\-]+\})", evaluator, RegexOptions.ExplicitCapture);
+                    Logger.Debug($"{enVar.Key} has not been set as a device or fleet variable.");
+                    //If there is a value set in the plugin itself
+                    if (null != enVar.Value)
+                    {
+                        Logger.Debug($"{enVar.Key} has a default value of {enVar.Value}.");
+                        //We need to see if the default, is actually a template value which we can try to auto-discover via the supervisor state
+                        string value;
+                        try
+                        {
+                            value = Regex.Replace(enVar.Value, @"(\$\{[a-zA-Z\-]+\})", supervisorDiscovery, RegexOptions.ExplicitCapture);
+                        }
+                        catch(KeyNotFoundException ex)
+                        {
+                            Logger.Debug($"{enVar.Key} matched auto-discovery pattern, but no service matched. Value not set.");
+                            continue;
+                        }
 
-                    var method = enVar.Value == value ? "default" : "discovered";
-                    _logger.Information($"{Name} setting {enVar.Key} to {method} value: {value}");
-                    _environmentHandler.SetEnvironmentVariable(enVar.Key, value);
+                        var method = enVar.Value == value ? "default" : "discovered";
+                        Logger.Information($"{Name} setting {enVar.Key} to {method} value: {value}");
+                        _environmentHandler.SetEnvironmentVariable(enVar.Key, value);
+                    }
+                    else
+                    {
+                        Logger.Debug($"{enVar.Key} has no default value.");
+                    }
+                }
+                else
+                {
+                    Logger.Information($"{enVar.Key} set as device or fleet variable: {enVar.Value}");
                 }
             }
         }
@@ -90,16 +126,24 @@ namespace connector.plugins
         {
             if (difference.Any() && (difference.Count() < ConfigurationEnvironmentVariables.Keys.Count))
             {
-                _logger.Warning($"Some environment variables configuring {Name} detected, but not all. The following are missing:");
+                Logger.Warning($"Some environment variables configuring {Name} detected, but not all. The following are missing:");
                 foreach (var enVar in difference)
                 {
-                    _logger.Warning(enVar);
+                    Logger.Warning(enVar);
                 }
             }
         }
 
-        private string Evaluator(Match match)
+        private string SupervisorDiscovery(Match match)
         {
+            if(null == ServiceName)
+            {
+                //nothing to match
+                // return null;
+                throw new KeyNotFoundException();
+            }
+
+            Logger.Debug($"{match.Value} matches the auto-discovery pattern. Checking for service {ServiceName}");
             if (_SupervisorHandler.ServiceExistsInState(ServiceName))
             {
                 var serviceDefinition = _SupervisorHandler.GetServiceDefinition(ServiceName);
@@ -115,7 +159,7 @@ namespace connector.plugins
                 }
             }
 
-            return match.Value;
+            throw new KeyNotFoundException();
         }
     }
 
@@ -126,7 +170,7 @@ namespace connector.plugins
         public ILogger Logger { get; }
         public ISupervisorHandler SupervisorHandler { get; }
 
-        public PluginDependencyAggregate(IEnvironmentHandler environmentHandler, IYamlResolver yamlResolver, ISupervisorHandler supervisorHandler, ILogger logger )
+        public PluginDependencyAggregate(IEnvironmentHandler environmentHandler, IYamlResolver yamlResolver, ISupervisorHandler supervisorHandler, ILogger logger)
         {
             EnvironmentHandler = environmentHandler;
             YamlResolver = yamlResolver;
@@ -134,6 +178,7 @@ namespace connector.plugins
             Logger = logger;
         }
     }
+
     public interface IPluginDependencyAggregate
     {
         public IEnvironmentHandler EnvironmentHandler { get; }

@@ -11,16 +11,18 @@ namespace connector
 {
     public class DaprManager : IDaprManager
     {
-        private readonly string daprPort;
-        private readonly string daprGrpcPort;
+        private readonly string _daprPort;
+        private readonly string _appComponents;
+        private readonly string _daprGrpcPort;
         private readonly ILogger _logger;
         private readonly bool _debug;
 
         public DaprManager(ILogger logger)
         {
-            daprPort = Environment.GetEnvironmentVariable("DAPR_HTTP_PORT") ?? "3500";
-            daprGrpcPort = Environment.GetEnvironmentVariable("DAPR_GRPC_PORT") ?? "50001";
+            _daprPort = Environment.GetEnvironmentVariable("DAPR_HTTP_PORT") ?? "3500";
+            _daprGrpcPort = Environment.GetEnvironmentVariable("DAPR_GRPC_PORT") ?? "50001";
             _debug = (Environment.GetEnvironmentVariable("DEBUG") ?? "false") == "true";
+            _appComponents = Environment.GetEnvironmentVariable("COMPONENTS_PATH") ?? "/app/components";
             _logger = logger;
         }
 
@@ -29,15 +31,16 @@ namespace connector
             _logger.Information("Starting dapr");
             var dapr = new ProcessStartInfo("dapr")
             {
-                Arguments = $"run --components-path /app/components --app-protocol grpc --app-port 50051 --dapr-http-port {daprPort} --dapr-grpc-port {daprGrpcPort} --app-id connector"
+                Arguments = $"run --components-path {_appComponents} --app-protocol grpc --app-port 50051 --dapr-http-port {_daprPort} --dapr-grpc-port {_daprGrpcPort} --app-id connector"
             };
-            
-            dapr.RedirectStandardOutput = _debug;
+
+            dapr.RedirectStandardOutput = !_debug;
 
             var proc = Process.Start(dapr);
             //TODO: this sleep does not work - the whole thread blocks, including dapr finishing initialisation
             Thread.Sleep(5000); // need to wait for dapr to load and configure itself
 
+            //Now start the dapr dashboard
             dapr = new ProcessStartInfo("dapr")
             {
                 Arguments = $"dashboard"
@@ -58,7 +61,7 @@ namespace connector
             var httpClient = new HttpClient();
             try
             {
-                var response = await httpClient.GetAsync($"http://localhost:{daprPort}/v1.0/metadata");
+                var response = await httpClient.GetAsync($"http://localhost:{_daprPort}/v1.0/metadata");
                 response.EnsureSuccessStatusCode();
                 var responseBody = await response.Content.ReadAsStringAsync();
                 var json = JsonDocument.Parse(responseBody, jsonDocumentOptions);
@@ -83,8 +86,9 @@ namespace connector
 
     public class DaprComponent
     {
-        public string Name { get; set; }
-        public string Type { get; set; }
-        public string Version { get; set; }
+        //these are lowercase, so that the json deserialisation works. :)
+        public string name { get; set; }
+        public string type { get; set; }
+        public string version { get; set; }
     }
 }

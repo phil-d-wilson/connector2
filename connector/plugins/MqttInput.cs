@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using System;
 
 namespace connector.plugins
 {
@@ -7,12 +8,12 @@ namespace connector.plugins
         public MqttInput(IPluginDependencyAggregate dependencyAggregate) : base(dependencyAggregate)
         {
             Name = "MqttInput";
-            Direction = "input";
+            Direction = Environment.GetEnvironmentVariable("MQTT_DIRECTION") ?? "input";
             ServiceName = "mqtt";
             ConfigurationEnvironmentVariables = new Dictionary<string, string> {
-                {"MQTT_INPUT_SERVER", "tcp://${service-address}:${service-port}"},
-                {"MQTT_INPUT_TOPIC", "balena"},
-                {"MQTT_INPUT_QOS", "1"}
+                {"MQTT_SERVER", "tcp://${service-address}:${service-port}"},
+                {"MQTT_TOPIC", "balena"},
+                {"MQTT_QOS", "1"}
             };
         }
     }

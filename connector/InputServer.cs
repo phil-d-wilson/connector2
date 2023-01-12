@@ -21,7 +21,7 @@ namespace connector
         public InputServer(ILogger logger, IPluginManager pluginManager, IOutputClient outputClient)
         {
             _logger = logger;
-            _logger.Debug("Constructing gRPC AppCallback service");
+            _logger.Debug("Constructing InputServer");
             _pluginManager = pluginManager;
             _logger.Debug($"gRPC service has {_pluginManager.Plugins.Count} plugins");
             _outputClient = outputClient;
@@ -40,7 +40,7 @@ namespace connector
 
             foreach (var plugin in _pluginManager.Plugins.Where(p => p.Direction == "input"))
             {
-                _logger.Information($"Subscribing gRPC server to component: {plugin.Name}");
+                _logger.Information($"Subscribing gRPC server to input component: {plugin.Name}");
                 bindings.Add(plugin.Name);
             }
             

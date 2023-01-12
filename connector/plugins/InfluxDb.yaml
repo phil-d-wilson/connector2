@@ -1,0 +1,17 @@
+apiVersion: dapr.io/v1alpha1
+kind: Component
+metadata:
+  name: InfluxDb
+spec:
+  type: bindings.influx
+  version: v1
+  ignoreErrors: true
+  metadata:
+  - name: url
+    value: !ENV ${INFLUX_URL}
+  - name: token
+    value: !ENV ${INFLUX_TOKEN}
+  - name: org 
+    value: !ENV ${INFLUX_ORG}
+  - name: bucket
+    value: !ENV ${INFLUX_BUCKET}

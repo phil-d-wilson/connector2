@@ -5,12 +5,13 @@ metadata:
 spec:
   type: bindings.redis
   version: v1
+  ignoreErrors: true
   metadata:
   - name: redisHost
-    value: !ENV ${REDIS_OUTPUT_HOST}
+    value: !ENV ${REDIS_HOST}
   - name: redisUsername
-    value: !ENV ${REDIS_OUTPUT_USERNAME}
+    value: !ENV ${REDIS_USERNAME}
   - name: redisPassword
-    value: !ENV ${REDIS_OUTPUT_PASSWORD}
+    value: !ENV ${REDIS_PASSWORD}
   - name: enableTLS
     value: false

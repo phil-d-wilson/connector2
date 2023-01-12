@@ -1,5 +1,6 @@
 using System.Net.Http;
 using System.Text.Json;
+using System.Text.Json.Nodes;
 using System.Collections.Generic;
 using System;
 using System.Threading.Tasks;
@@ -12,11 +13,13 @@ namespace connector.supervisor
     {
         private readonly List<ServiceDefinition> _serviceDefinitions;
         private readonly ILogger _logger;
+        private readonly string _appId;
 
         public SupervisorHandler(ILogger logger)
         {
             _serviceDefinitions = new List<ServiceDefinition>() { };
             _logger = logger;
+            _appId = Environment.GetEnvironmentVariable("BALENA_APP_ID");
         }
         public async Task GetTargetStateAsync()
         {
@@ -42,24 +45,42 @@ namespace connector.supervisor
                 var response = await httpClient.GetAsync($"{supervisorAddress}/v2/local/target-state?apikey={supervisorApiKey}");
                 response.EnsureSuccessStatusCode();
                 var responseBody = await response.Content.ReadAsStringAsync();
-                var document = JsonDocument.Parse(responseBody, jsonDocumentOptions);
-                var appId = document.RootElement.GetProperty("state").GetProperty("local").GetProperty("apps").ToString().Split('\"')[1];
-                foreach (var element in document.RootElement.GetProperty("state").GetProperty("local").GetProperty("apps").GetProperty(appId).GetProperty("services").EnumerateArray())
+
+                if ((JsonNode.Parse(responseBody)["state"]["local"]["apps"]).ToString() == "{}")
                 {
-                    var serviceName = GetServiceNameOrDefault(element);
+                    _logger.Information("The balena Supervisor target state shows no release running. Continuing without auto-discovery functionality.");
+                    return;
+                }
+
+                var services = (JsonArray)JsonNode.Parse(responseBody)["state"]["local"]["apps"][_appId]["services"];
+                _logger.Debug($"Supervisor target state shows {services.Count} services in running release.");
+                string connectorNetworkMode = GetConnectorNetworkModeOrDefault(services);
+                foreach (var service in services)
+                {
+                    var serviceName = service["serviceName"].ToString();
                     if (serviceName == "connector")
                     {
                         continue;
                     }
-                    var networkMode = GetNetworkModeOrDefault(element);
-                    // _logger.Info($"Expose: {element.GetProperty("config").GetProperty("expose")}");
-                    var port = GetPortOrDefault(element);
-                    var networks = GetNetworksOrDefault(element);
+                    _logger.Debug($"Assessing service: {serviceName}");
+                    var networkMode = GetNetworkModeOrDefault(service);
+                    var port = GetPortOrDefault(service);
+                    if (null == port)
+                    {
+                        _logger.Warning($"Could not discover a port for {serviceName}. Service not added to auto-discovery.");
+                        continue;
+                    }
+                    var networks = GetNetworksOrDefault(service);
 
                     string address = null;
                     if (null != networks)
                     {
-                        address = GetAddress(networkMode, (JsonElement)networks);
+                        address = GetAddress(_appId, networkMode, connectorNetworkMode, (JsonNode)networks);
+                        if(null == address)
+                        {
+                            _logger.Warning($"Could not discover an address for {serviceName}. Service not added to auto-discovery.");
+                            continue;
+                        }
                     }
 
                     _serviceDefinitions.Add(new ServiceDefinition
@@ -68,26 +89,50 @@ namespace connector.supervisor
                         Port = port,
                         Address = address
                     });
+                    _logger.Debug($"Service discovered: {serviceName} on port {port} at {address}");
                 }
             }
             catch (Exception e)
             {
                 _logger.Error("\nException Caught!");
                 _logger.Error("Message :{0} ", e.Message);
+                _logger.Information("Unable to find or connect to a balena supervisor - continuing without auto-discovery functionality.");
             }
         }
 
-        private static string GetAddress(string networkMode, JsonElement networks)
+        private string GetConnectorNetworkModeOrDefault(JsonArray services)
         {
-            if ("host" == networkMode)
+            string output = null;
+            foreach (var service in services)
+            {
+                if (service["serviceName"].ToString() != "connector")
+                {
+                    continue;
+                }
+
+                output = GetNetworkModeOrDefault(service);
+            }
+
+            if (null == output)
+            {
+                _logger.Error("Could not find a service called Connector. Make sure the docker-compose names this block Connector. Setting network mode to 'bridged' but this may not be correct!");
+                return "bridge";
+            }
+
+            return output;
+        }
+
+        private static string GetAddress(string appId, string networkMode, string connectorNetworkMode, JsonNode networks)
+        {
+            if ("host" == networkMode || "host" == connectorNetworkMode)
             {
                 return "localhost";
             }
 
             try
             {
-                var aliases = networks.GetProperty("1_default").GetProperty("aliases").EnumerateArray();
-                return aliases.FirstOrDefault().ToString();
+                var aliases = networks[appId + "_default"]["aliases"];
+                return ""; //TODO WTF is this?
             }
             catch (Exception)
             {
@@ -95,11 +140,11 @@ namespace connector.supervisor
             }
         }
 
-        private static string GetServiceNameOrDefault(JsonElement element)
+        private static string GetServiceNameOrDefault(JsonNode element)
         {
             try
             {
-                return element.GetProperty("serviceName").ToString();
+                return element["serviceName"].ToString();
             }
             catch (Exception)
             {
@@ -107,11 +152,11 @@ namespace connector.supervisor
             }
         }
 
-        private static JsonElement? GetNetworksOrDefault(JsonElement element)
+        private static JsonNode GetNetworksOrDefault(JsonNode node)
         {
             try
             {
-                return element.GetProperty("config").GetProperty("networks");
+                return node["config"]["networks"];
             }
             catch (Exception)
             {
@@ -119,11 +164,11 @@ namespace connector.supervisor
             }
         }
 
-        private static string GetNetworkModeOrDefault(JsonElement element)
+        private static string GetNetworkModeOrDefault(JsonNode node)
         {
             try
             {
-                return element.GetProperty("config").GetProperty("networkMode").ToString();
+                return node["config"]["networkMode"].ToString();
             }
             catch (Exception)
             {
@@ -131,18 +176,17 @@ namespace connector.supervisor
             }
         }
 
-        private static string GetPortOrDefault(JsonElement element)
+        private static string GetPortOrDefault(JsonNode node)
         {
             try
             {
-                var ports = element.GetProperty("config").GetProperty("portMaps").EnumerateArray();
-                if (!ports.Any())
+                var ports = node["config"]["portMaps"];
+                if (((JsonArray)ports).Count < 1)
                 {
                     return null;
                 }
 
-                return ports.First().GetProperty("ports").GetProperty("internalStart").ToString();
-
+                return ((JsonArray)ports).First()["ports"]["internalStart"].ToString();
             }
             catch (Exception)
             {
@@ -152,12 +196,12 @@ namespace connector.supervisor
 
         public bool ServiceExistsInState(string serviceName)
         {
-            return (_serviceDefinitions.Any(s => s.Name == serviceName));
+            return (_serviceDefinitions.Any(s => s.Name.ToLower() == serviceName.ToLower()));
         }
 
         public ServiceDefinition GetServiceDefinition(string serviceName)
         {
-            return _serviceDefinitions.Where(s => s.Name == serviceName).FirstOrDefault();
+            return _serviceDefinitions.Where(s => s.Name.ToLower() == serviceName.ToLower()).FirstOrDefault();
         }
     }
 

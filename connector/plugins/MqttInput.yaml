@@ -8,10 +8,10 @@ spec:
   ignoreErrors: true
   metadata:
   - name: url
-    value: !ENV ${MQTT_INPUT_SERVER}
+    value: !ENV ${MQTT_SERVER}
   - name: topic
-    value: !ENV ${MQTT_INPUT_TOPIC}
+    value: !ENV ${MQTT_TOPIC}
   - name: qos
-    value: !ENV ${MQTT_INPUT_QOS}
+    value: !ENV ${MQTT_QOS}
   - name: consumerID
     value: "{uuid}"

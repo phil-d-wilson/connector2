@@ -1,12 +1,10 @@
-FROM mcr.microsoft.com/dotnet/sdk:6.0 as build
+FROM mcr.microsoft.com/dotnet/sdk:7.0 as build
 
 WORKDIR /usr/src/app
 
 COPY . .
 RUN rm -rf ./obj
 RUN rm -rf ./bin
-
-
 
 #Build and publish project
 RUN dotnet publish -p:PublishSingleFile=true -r linux-musl-x64 --self-contained true -p:PublishTrimmed=True -p:TrimMode=Link -c Release -o /usr/src/app/publish -v quiet
